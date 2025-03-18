@@ -1,0 +1,68 @@
+name: Build PyTorch 2.6.0 with CUDA 10.2/cuDNN 7.6.5 and Wasabi Upload (Windows)
+
+on:
+  workflow_dispatch:  # Allows manual triggering of the workflow
+
+jobs:
+  build:
+    runs-on: windows-latest  # Run on a Windows runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'  # Use Python 3.9
+          architecture: 'x64'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cmake ninja mkl mkl-include cffi pyyaml setuptools wheel ninja libpng libjpeg libtiff opencv-python torchvision torchaudio
+
+      - name: Install CUDA Toolkit 10.2 and cuDNN 7.6.5
+        shell: powershell
+        run: |
+          # Download CUDA Toolkit 10.2
+          Invoke-WebRequest -Uri "https://developer.download.nvidia.com/compute/cuda/10.2/local_installers/cuda_10.2.89_470.82.01_windows.exe" -OutFile "cuda_installer.exe"
+
+          # Install CUDA Toolkit (Silent Install)
+          Start-Process -FilePath "cuda_installer.exe" -ArgumentList "/S" -Wait
+
+          # Download cuDNN 7.6.5
+          Invoke-WebRequest -Uri "https://developer.download.nvidia.com/cudnn/cuDNN_v7.6.5_for_cuda10.2_Windows.zip" -OutFile "cudnn.zip"
+
+          # Extract cuDNN
+          Expand-Archive -Path "cudnn.zip" -DestinationPath "cudnn"
+
+          # Copy cuDNN files to CUDA directory
+          Copy-Item -Path "cudnn\cuda\bin\cudnn64_7.dll" -Destination "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\bin" -Force
+          Copy-Item -Path "cudnn\cuda\include\cudnn.h" -Destination "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\include" -Force
+          Copy-Item -Path "cudnn\cuda\lib\x64\cudnn.lib" -Destination "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2\lib\x64" -Force
+
+      - name: Clone PyTorch
+        run: |
+          git clone --recursive https://github.com/pytorch/pytorch.git
+          cd pytorch
+          git checkout v2.6.0
+
+      - name: Build PyTorch Wheel
+        run: |
+          cd pytorch
+          $env:CUDA_HOME="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2"
+          $env:CUDNN_HOME="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v10.2"
+          $env:PATH="$CUDA_HOME\bin;$env:PATH"
+          $env:LD_LIBRARY_PATH="$CUDA_HOME\lib\x64;$env:LD_LIBRARY_PATH"
+          python setup.py bdist_wheel --cmake --cuda --cudnn --build-version=2.6.0+cu102
+
+      - name: Upload to Wasabi
+        env:
+          WASABI_ACCESS_KEY_ID: ${{ secrets.IHX2R0SV6O86M5GNP0Q8 }}
+          WASABI_SECRET_ACCESS_KEY: ${{ secrets.KCXdyXYkLkaGyGRZAjzqihAg1JgsPHoNo8RqgV8q }}
+          WASABI_BUCKET_NAME: ${{ secrets.egyptnew }}
+          WASABI_REGION: ${{ secrets.s3.eu-south-1.wasabisys.com }}
+        run: |
+          pip install wasabi
+          wasabi cp pytorch/dist/*.whl s3://${WASABI_BUCKET_NAME}/pytorch-2.6.0-cu102-win.whl  # Adjust filename as needed
