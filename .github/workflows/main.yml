@@ -24,10 +24,11 @@ jobs:
           .\bootstrap-vcpkg.bat
           cd ..
 
-      - name: Install libpng with vcpkg
+      - name: Install libpng and mkl with vcpkg
         run: |
           cd vcpkg
           .\vcpkg install libpng:x64-windows
+          .\vcpkg install mkl:x64-windows
           cd ..
 
       - name: Set vcpkg environment variables
@@ -39,7 +40,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip setuptools
-          python -m pip install cmake ninja mkl mkl-include cffi pyyaml setuptools wheel ninja torchvision torchaudio --no-cache-dir --global-option="--cpp-ext-in-py" --global-option="--vcpkg-root=${{ env.VCPKG_ROOT_DIR }}"
+          python -m pip install cmake ninja mkl-include cffi pyyaml setuptools wheel ninja torchvision torchaudio --no-cache-dir --global-option="--cpp-ext-in-py" --global-option="--vcpkg-root=${{ env.VCPKG_ROOT_DIR }}"
 
       - name: Install CUDA Toolkit 10.2 and cuDNN 7.6.5
         shell: powershell
